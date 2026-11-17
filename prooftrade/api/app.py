@@ -15,9 +15,8 @@ import logging
 import os
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-
 from prooftrade.engine import run_audit
 
 # ---------------------------------------------------------------------------
@@ -26,10 +25,28 @@ from prooftrade.engine import run_audit
 
 LOGGER = logging.getLogger("prooftrade.api")
 
-# CORS origins - narrow for development; override via ENV if needed
-_CORS_ORIGINS = os.getenv(
-    "PROOFTRADE_CORS_ORIGINS", "http://localhost:3000"
-).split(",")
+# Columns the deterministic engine requires.
+REQUIRED_COLUMNS = (
+    "trade_id",
+    "timestamp",
+    "symbol",
+    "side",
+    "quantity",
+    "price",
+    "pnl",
+)
+
+# CORS origins - narrow for development; override via ENV if needed.
+# In the default architecture the browser only talks to the Next.js server,
+# which forwards /api/* to this service, so CORS is a defence-in-depth setting.
+_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "PROOFTRADE_CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 # Maximum CSV row count to prevent OOM / DoS
 MAX_CSV_ROWS = int(os.getenv("PROOFTRADE_MAX_CSV_ROWS", "10000"))
@@ -76,16 +93,17 @@ def _csv_to_string(upload: UploadFile) -> str:
     return text
 
 
-def _validate_csv_header(csv_text: str) -> None:
-    """Ensure the CSV has the expected header line."""
-    first_line = csv_text.split("\n")[0].strip()
-    expected = "trade_id,timestamp,symbol,side,quantity,price,pnl,fees,slippage,strategy_name,notes"
-    if first_line != expected:
-        # Be lenient — just warn via the engine; don't reject immediately so
-        # the engine's own _validate_required_fields can report the precise issue.
-        LOGGER.warning(
-            "CSV header '%s' does not match expected '%s'", first_line, expected
-        )
+def _missing_columns(csv_text: str) -> list[str]:
+    """Return the required columns absent from the CSV header line.
+
+    Extra columns are tolerated; only the required set is enforced so that the
+    caller gets a precise, actionable error instead of a generic failure.
+    """
+    first_line = csv_text.split("\n", 1)[0].strip().lstrip("\ufeff")
+    if not first_line:
+        return list(REQUIRED_COLUMNS)
+    present = {column.strip().strip('"') for column in first_line.split(",")}
+    return [column for column in REQUIRED_COLUMNS if column not in present]
 
 
 # ---------------------------------------------------------------------------
@@ -113,12 +131,18 @@ async def healthz() -> dict[str, str]:
 _file_dep = File(...)
 
 @app.post("/api/audit", response_model=dict[str, Any])
-async def upload_audit(file: UploadFile = _file_dep) -> dict[str, Any]:
+async def upload_audit(
+    file: UploadFile = _file_dep,
+    assume_utc: bool = Form(True),
+) -> dict[str, Any]:
     """
     Upload a trade-history CSV and receive a full audit.
 
     The CSV must contain the header:
         trade_id,timestamp,symbol,side,quantity,price,pnl,fees,slippage,strategy_name,notes
+
+    The optional ``assume_utc`` form field mirrors the engine flag: when false,
+    timezone-naive timestamps are rejected instead of assumed to be UTC.
 
     The response includes:
     - dataset_id: unique ID for this audit run
@@ -134,6 +158,19 @@ async def upload_audit(file: UploadFile = _file_dep) -> dict[str, Any]:
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=400, detail="Could not read uploaded file.") from exc
 
+    if not csv_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file is empty. Upload a CSV with a header row.",
+        )
+
+    missing = _missing_columns(csv_text)
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail="CSV is missing required column(s): " + ", ".join(missing) + ".",
+        )
+
     # 2️⃣ Basic size / row count guard
     row_count = csv_text.count("\n")
     if row_count > MAX_CSV_ROWS:
@@ -144,12 +181,13 @@ async def upload_audit(file: UploadFile = _file_dep) -> dict[str, Any]:
 
     # 3️⃣ Run the engine
     try:
-        _validate_csv_header(csv_text)
-        result = run_audit(csv_text, assume_utc=True)
+        result = run_audit(csv_text, assume_utc=assume_utc)
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover — defensive
-        # Never expose stack traces or CSV contents in production error messages.
+        # Log server-side for diagnosis; never expose stack traces or CSV
+        # contents in the HTTP response.
+        LOGGER.exception("Audit engine raised an unexpected error")
         raise HTTPException(
             status_code=422, detail="Unable to process the provided CSV data."
         ) from exc

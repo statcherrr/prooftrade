@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prooftrade"
+version = "0.1.0"
+description = "ProofTrade deterministic audit engine"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.20",
+]
+
+# Canonical packaging manifest is /pyproject.toml at the repository root.
+# This file only makes `pytest api/` and `pytest tests/` work when the test
+# runner is invoked from inside this directory, by putting the repository root
+# on sys.path (no installation required).
+[tool.pytest.ini_options]
+pythonpath = [".."]
+testpaths = ["api", "tests"]

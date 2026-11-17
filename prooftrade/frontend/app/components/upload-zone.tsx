@@ -155,7 +155,8 @@ export function UploadZone({
           type="file"
           accept=".csv"
           onChange={handleFileChange}
-          className="hidden"
+          aria-label="Trade-history CSV file"
+          className="sr-only"
         />
       </div>
 
@@ -165,7 +166,7 @@ export function UploadZone({
         type="button"
         onClick={onSubmit}
         disabled={!csvFile || isPending}
-        className="w-full rounded-lg bg-[var(--color-accent-blue)] px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[var(--color-accent-blue)]/90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary w-full rounded-lg px-6 py-3 text-sm font-semibold"
       >
         {isPending ? (
           <span className="inline-flex items-center gap-2">

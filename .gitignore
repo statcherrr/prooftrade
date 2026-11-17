@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyw
+*.pyc
+*.pyd
+
+# Caches, logs and runtime state
+.pytest_cache/
+.ruff_cache/
+*.log
+*.sqlite3
+*.sqlite3-journal
+node_modules/
+.next/
+dist/
+build/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editor / environment
+.DS_Store
+*.swp
+*.swo
+.DS_Store?
+
+# Local secrets / env files
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Browser profiles and screenshot scratch space created by verification scripts
+tmp-profile/
+tmp-profile2/
+playwright-report/
+test-results/
+
+# Large generated bundles (submit these separately, not in Git)
+documents/*.zip

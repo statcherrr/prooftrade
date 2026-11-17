@@ -54,6 +54,7 @@ function FindingCard({
   index,
 }: { finding: Finding; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const panelId = `finding-panel-${finding.finding_id}`;
 
   const severityIcon: Record<Severity, React.ReactNode> = {
     high: (
@@ -93,13 +94,13 @@ function FindingCard({
 
   return (
     <div
-      className="group rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 transition-colors hover:border-[var(--color-border)]/80"
+      className="glass-card group rounded-lg p-4"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <SeverityBadge severity={finding.severity} />
-          <span className="text-xs font-mono text-[var(--color-text-muted)]">
+          <span className="text-xs font-mono text-[var(--color-text-secondary)]">
             {finding.check_name.replace(/_/g, " ")}
           </span>
           {finding.trade_id && (
@@ -109,9 +110,12 @@ function FindingCard({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-secondary)]"
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
           aria-expanded={expanded}
+          aria-controls={panelId}
+          aria-label={`${expanded ? "Hide" : "Show"} details for ${finding.check_name.replace(/_/g, " ")}${finding.trade_id ? ` (${finding.trade_id})` : ""}`}
         >
+          <span className="hidden sm:inline">{expanded ? "Hide details" : "Details"}</span>
           <svg
             viewBox="0 0 24 24"
             className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -131,7 +135,12 @@ function FindingCard({
       <p className="mt-2.5 text-sm text-[var(--color-text-secondary)]">{finding.description}</p>
 
       {expanded && (
-        <div className="mt-4 border-t border-[var(--color-border)] pt-4 space-y-4">
+        <div
+          id={panelId}
+          role="region"
+          aria-label={`Details for ${finding.check_name.replace(/_/g, " ")}`}
+          className="mt-4 border-t border-[var(--color-border)] pt-4 space-y-4"
+        >
           {/* Evidence */}
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-3">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
@@ -254,7 +263,7 @@ export function FindingsWorkspace({ findings }: FindingsWorkspaceProps) {
   return (
     <div className="space-y-4">
       {/* Severity overview */}
-      <div className="flex items-center gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
+      <div className="glass-card flex flex-col gap-3 rounded-lg p-4 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex items-center gap-2">
           <SeverityBadge severity="high" />
           <span className="text-sm font-medium text-[var(--color-text-primary)]">
@@ -273,13 +282,13 @@ export function FindingsWorkspace({ findings }: FindingsWorkspaceProps) {
             {severityCounts.low}
           </span>
         </div>
-        <div className="ml-auto text-xs text-[var(--color-text-muted)]">
+        <div className="text-xs text-[var(--color-text-muted)] sm:ml-auto">
           {findings.length} finding{findings.length !== 1 ? "s" : ""} total
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <select
           value={checkFilter}
           onChange={(e) => setCheckFilter(e.target.value)}
@@ -325,9 +334,12 @@ export function FindingsWorkspace({ findings }: FindingsWorkspaceProps) {
           <h4 className="text-base font-medium text-[var(--color-text-primary)]">
             No findings detected
           </h4>
-          <p className="mt-1 max-w-md mx-auto text-sm text-[var(--color-text-secondary)]">
+          <p
+            className="mx-auto mt-1 text-sm text-[var(--color-text-secondary)]"
+            style={{ maxWidth: "34rem" }}
+          >
             The engine did not detect any patterns flagged by its checks. This does not mean the
-            data is perfect — only that no heuristic thresholds were crossed.
+            data is perfect - only that no heuristic thresholds were crossed.
           </p>
         </div>
       ) : filteredFindings.length === 0 ? (

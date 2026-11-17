@@ -1,223 +1,149 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import Link from "next/link";
 import { Navbar } from "@/app/components/navbar";
-import { UploadZone } from "@/app/components/upload-zone";
-import { CSVFormat } from "@/app/components/csv-format";
-import { SettingsPanel } from "@/app/components/settings-panel";
-import { MetricsGrid } from "@/app/components/metrics-grid";
-import { FindingsWorkspace, type Finding } from "@/app/components/findings-workspace";
-import { Disclaimer } from "@/app/components/disclaimer";
-import { ErrorBanner } from "@/app/components/error-banner";
-import { LoadingState } from "@/app/components/loading-state";
+import { designTokens, glassUnderlay } from "@/app/components/design-tokens";
+import type { Finding } from "@/app/components/findings-workspace";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface Summary {
-  total_trades: number;
-  valid_trades: number;
-  net_pnl: number;
-  win_rate: number;
-  profit_factor: string | number;
-  sharpe_ratio: number | null;
-  max_drawdown: number | null;
+ total_trades: number;
+ valid_trades: number;
+ net_pnl: number;
+ win_rate: number;
+ profit_factor: string | number;
+ sharpe_ratio: number | null;
+ max_drawdown: number | null;
 }
 
 interface AuditResponse {
-  dataset_id: string;
-  row_count: number;
-  findings: Finding[];
-  summary: Summary;
-}
-
-// ── Page ────────────────────────────────────────────────────────────────────
+ dataset_id: string;
+ row_count: number;
+ findings: Finding[];
+ summary: Summary;
+}// ── Overview landing page ───────────────────────────────────────────────────
+// Polished ProofTrade overview landing page with liquid-glass design,
+// navigation, key-value highlights, and a CTA to start a new audit.
 
 export default function Home() {
-  const [phase, setPhase] = useState<"upload" | "results">("upload");
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [assumeUtc, setAssumeUtc] = useState(true);
-  const [isPending, startTransition] = useTransition();
-  const [auditResult, setAuditResult] = useState<AuditResponse | null>(null);
-  const [error, setError] = useState<{ detail: string } | null>(null);
+ const { bgPrimary, bgSecondary, bgTertiary, glassBase, glassElevated, glassSubtle, glassFrosted, borderBase, textPrimary, textSecondary, textMuted, accentBlue, accentCyan, radiusMd, radiusLg, radiusXl, spaceMd, spaceLg, blurMd } = designTokens;
 
-  const handleFileChange = useCallback((file: File | null) => {
-    setCsvFile(file);
-    setError(null);
-  }, []);
+ return (
+ <div
+ className="relative min-h-screen overflow-hidden bg-[var(--color-bg-primary)]"
+ style={{
+ background: `radial-gradient(120% 80% at 50% 0%, rgba(14, 26, 42, 0.45) 0%, rgba(7, 9, 13, 0.85) 60%, transparent 100%)`,
+ }}
+ >
+ {/* Liquid-glass underlay for the whole page */}
+ <div style={glassUnderlay} />
 
-  const handleReset = useCallback(() => {
-    setPhase("upload");
-    setCsvFile(null);
-    setAuditResult(null);
-    setError(null);
-  }, []);
+ <Navbar />
 
-  const handleSubmit = useCallback(() => {
-    if (!csvFile) return;
+ <main className="relative z-10 mx-auto max-w-5xl px-6 pb-16 pt-12">
+ {/* Lockup / eyebrow */}
+ <div className="flex items-center gap-3">
+ <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-1.5">
+ <svg
+ viewBox="0 0 24 24"
+ className="h-5 w-5 text-[var(--color-accent-blue)]"
+ aria-hidden="true"
+ >
+ <path
+ stroke="currentColor"
+ strokeWidth="1.75"
+ strokeLinecap="round"
+ strokeLinejoin="round"
+ d="M3.75 7.5h16.5M3.75 12h10.5M3.75 16.5h6.75"
+ />
+ <circle cx="20.25" cy="16.5" r="1.25" fill="currentColor" />
+ </svg>
+ </div>
+ <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
+ Deterministic audit engine
+ </span>
+ </div>
 
-    startTransition(() => {
-      const formData = new FormData();
-      formData.append("file", csvFile);
+ {/* Headline */}
+ <div className="mt-8 text-center">
+ <h1 className="text-4xl font-semibold tracking-tight text-[var(--color-text-primary)] leading-[1.1]">
+ Audit your trade history
+ <span className="block text-[var(--color-accent-blue)]">
+ with deterministic precision
+ </span>
+ </h1>
+ <p className="mt-4 max-w-xl text-lg text-[var(--color-text-secondary)] leading-relaxed text-balance">
+ Upload a CSV of your trades and get a deterministic analysis of net P&amp;L, win rate,
+ profit factor, Sharpe ratio, maximum drawdown, and pattern-based risk findings.
+ No LLM calls. No external services. No hidden randomness.
+ </p>
+ </div>
 
-      fetch("/api/audit", {
-        method: "POST",
-        body: formData,
-      })
-        .then((res) => {
-          if (!res.ok) {
-            return res.json().then((data) => {
-              throw new Error(data.detail ?? `Upload failed with status ${res.status}`);
-            });
-          }
-          return res.json();
-        })
-        .then((data: AuditResponse) => {
-          setAuditResult(data);
-          setPhase("results");
-        })
-        .catch((err) => {
-          setError({ detail: err instanceof Error ? err.message : "An unexpected error occurred." });
-        });
-    });
-  }, [csvFile]);
-
-  const findingCounts = auditResult
-    ? {
-        high: auditResult.findings.filter((f) => f.severity === "high").length,
-        medium: auditResult.findings.filter((f) => f.severity === "medium").length,
-        low: auditResult.findings.filter((f) => f.severity === "low").length,
-      }
-    : { high: 0, medium: 0, low: 0 };
-
-  return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)]">
-      <Navbar />
-
-      <main className="mx-auto max-w-5xl px-6 pb-16 pt-8">
-        {phase === "upload" && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="mb-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-                Audit your trade history
-              </h1>
-              <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-                Upload a CSV of your trades and get a deterministic analysis of net P&L, win rate,
-                profit factor, Sharpe ratio, maximum drawdown, and pattern-based risk findings.
-              </p>
-            </div>
-
-            {/* CSV format */}
-            <CSVFormat />
-
-            {/* Upload + settings in a two-column layout */}
-            <div className="grid gap-4 lg:grid-cols-5">
-              {/* Upload zone spans most of the width */}
-              <div className="lg:col-span-3">
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
-                  <h2 className="mb-4 text-sm font-semibold text-[var(--color-text-primary)]">
-                    Upload trade history
-                  </h2>
-                  <UploadZone
-                    csvFile={csvFile}
-                    onError={setError}
-                    onFileChange={handleFileChange}
-                    onSubmit={handleSubmit}
-                    isPending={isPending}
-                  />
-                </div>
-              </div>
-
-              {/* Settings panel */}
-              <div className="lg:col-span-2">
-                <SettingsPanel assumeUtc={assumeUtc} onChange={setAssumeUtc} />
-              </div>
-            </div>
-
-            {/* Error */}
-            {error && <ErrorBanner detail={error.detail} onDismiss={() => setError(null)} />}
-
-            {/* Spacer for fixed header */}
-            <div className="h-4" />
-          </div>
-        )}
-
-        {phase === "results" && auditResult && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Results header */}
+ {/* Metric highlights */}
+ <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">        {[
+          { label: "Deterministic", value: "No LLMs", desc: "Pure rule-based engine" },
+          { label: "Transparent", value: "Documented", desc: "Every finding carries evidence" },
+          { label: "Private", value: "Not stored", desc: "CSV is analyzed, never persisted" },
+          { label: "Repeatable", value: "Identical", desc: "Same CSV and settings, same output" },
+        ].map((stat) => (
+          <div key={stat.label} className="glass-card rounded-xl p-5">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-                  Audit results
-                  <span className="ml-2 font-normal text-[var(--color-text-muted)]">
-                    {auditResult.row_count} record{auditResult.row_count !== 1 ? "s" : ""} analyzed
-                  </span>
-                </h1>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  Deterministic audit of your trade history using the ProofTrade engine.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                New audit
-              </button>
+              <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                {stat.label}
+              </span>
             </div>
-
-            {/* Metrics */}
-            <MetricsGrid
-              summary={auditResult.summary}
-              findingCounts={findingCounts}
-              datasetId={auditResult.dataset_id}
-            />
-
-            {/* Disclaimer */}
-            <Disclaimer />
-
-            {/* Findings */}
-            <div>
-              <h2 className="mb-1 text-lg font-semibold text-[var(--color-text-primary)]">
-                Findings
-              </h2>
-              <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-                Issues detected by the engine, grouped by severity. Expand each to see evidence,
-                limitations, and remediation guidance.
-              </p>
-              <FindingsWorkspace findings={auditResult.findings} />
-            </div>
-
-            <div className="h-4" />
+            <p className="mt-2 text-2xl font-semibold font-mono text-[var(--color-text-primary)]">
+              {stat.value}
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{stat.desc}</p>
           </div>
-        )}
+        ))}
+ </div>
 
-        {phase === "results" && !auditResult && (
-          <LoadingState />
-        )}
-      </main>
+ {/* CTA row - start a new audit */}      <div className="glass-panel mt-10 flex flex-col items-center gap-4 rounded-2xl p-6 sm:p-8">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          Ready to run an audit?
+        </p>
+        <Link
+          href="/audit"
+          className="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
+        >
+ <svg
+ viewBox="0 0 24 24"
+ className="h-4 w-4"
+ aria-hidden="true"
+ >
+ <path
+ stroke="currentColor"
+ strokeWidth="1.75"
+ strokeLinecap="round"
+ strokeLinejoin="round"
+ d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+ />
+ </svg>          New audit
+        </Link>
+      </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[var(--color-border)]">
-        <div className="mx-auto max-w-5xl px-6 py-6 text-center text-xs text-[var(--color-text-muted)]">
-          ProofTrade — Deterministic audit engine for trade-history CSV data.
-          <br />
-          This tool is for research and analysis purposes only; it is not financial advice.
-        </div>
-      </footer>
-    </div>
-  );
+      {/* Footer links */}
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--color-text-muted)]">
+        <Link href="/methodology" className="transition-colors hover:text-[var(--color-text-primary)]">
+          Audit methodology
+        </Link>
+        <Link href="/settings" className="transition-colors hover:text-[var(--color-text-primary)]">
+          Settings
+        </Link>
+      </div>
+ </main>
+
+ {/* Footer */}
+ <footer className="relative z-10 border-t border-[var(--color-border)]">
+ <div className="mx-auto max-w-5xl px-6 py-6 text-center text-xs text-[var(--color-text-muted)]">
+ ProofTrade - Deterministic audit engine for trade-history CSV data.
+ <br />
+ This tool is for research and analysis purposes only; it is not financial advice.
+ </div>
+ </footer>
+ </div>
+ );
 }

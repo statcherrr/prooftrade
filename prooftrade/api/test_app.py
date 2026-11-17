@@ -30,7 +30,6 @@ def _make_csv(rows: list[dict[str, str]]) -> str:
 def _api_client():
     """Return a FastAPI TestClient for the prooftrade API."""
     from fastapi.testclient import TestClient
-
     from prooftrade.api.app import app
     return TestClient(app)
 
@@ -227,3 +226,76 @@ class TestEngineDeterminismViaAPI:
         fn1 = {f["check_name"] for f in b1["findings"]}
         fn2 = {f["check_name"] for f in b2["findings"]}
         assert fn1 == fn2, f"Findings differ: {fn1} vs {fn2}"
+
+# ---------------------------------------------------------------------------
+# Phase 3.11 — input contract: empty file, precise missing-column message,
+# timezone preference pass-through
+# ---------------------------------------------------------------------------
+
+class TestAuditInputContract:
+    def test_empty_file_returns_actionable_400(self):
+        """A zero-byte upload should fail with a clear message, not a stack trace."""
+        client = _api_client()
+        resp = client.post(
+            "/api/audit",
+            files={"file": ("empty.csv", "", "text/csv")},
+        )
+        assert resp.status_code == 400
+        assert "empty" in resp.json()["detail"].lower()
+
+    def test_missing_columns_are_named_in_error(self):
+        """The 422 detail should name the missing columns."""
+        client = _api_client()
+        resp = client.post(
+            "/api/audit",
+            files={"file": ("bad.csv", "trade_id,timestamp\n1,2023-01-01T10:00:00Z\n", "text/csv")},
+        )
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "symbol" in detail and "pnl" in detail
+
+    def test_assume_utc_false_reports_naive_timestamps(self):
+        """assume_utc=false must reach the engine and flag tz-naive rows."""
+        csv_text = (
+            "trade_id,timestamp,symbol,side,quantity,price,pnl,fees,slippage,strategy_name,notes\n"
+            "tz001,2023-01-01T10:00:00,AAPL,buy,100,150.00,50.00,1.00,0.00,stratA,naive timestamp\n"
+        )
+        client = _api_client()
+        assume = client.post(
+            "/api/audit",
+            files={"file": ("naive.csv", csv_text, "text/csv")},
+            data={"assume_utc": "true"},
+        )
+        reject = client.post(
+            "/api/audit",
+            files={"file": ("naive.csv", csv_text, "text/csv")},
+            data={"assume_utc": "false"},
+        )
+        assert assume.status_code == 200 and reject.status_code == 200
+        assert assume.json()["summary"]["valid_trades"] == 1
+        # Rejected rows are excluded from metrics but reported as a finding.
+        assert reject.json()["summary"]["valid_trades"] == 0
+        assert any(
+            "timezone" in f["description"].lower() for f in reject.json()["findings"]
+        )
+
+    def test_minimal_seven_column_csv_is_accepted(self):
+        """A CSV with only the seven required columns must audit successfully.
+
+        fees/slippage are optional cost columns; requiring them in practice
+        produced an opaque 422 for otherwise valid trade histories.
+        """
+        csv_text = (
+            "trade_id,timestamp,symbol,side,quantity,price,pnl\n"
+            "m001,2023-01-01T10:00:00Z,AAPL,buy,10,100.00,50.00\n"
+            "m002,2023-01-02T10:00:00Z,AAPL,sell,10,110.00,-20.00\n"
+        )
+        client = _api_client()
+        resp = client.post(
+            "/api/audit",
+            files={"file": ("minimal.csv", csv_text, "text/csv")},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["summary"]["total_trades"] == 2
+        assert body["summary"]["net_pnl"] == 30.0

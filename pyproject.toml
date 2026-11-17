@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prooftrade"
+version = "0.1.0"
+description = "ProofTrade deterministic trade-history audit engine"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "python-multipart>=0.0.9",
+]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["prooftrade*"]
+
+# Tests can be run either from the repository root (`pytest prooftrade/api`)
+# or from inside prooftrade/ (`pytest api/`); "." puts the repository root on
+# sys.path so no installation step is required.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["prooftrade/api", "prooftrade/tests"]

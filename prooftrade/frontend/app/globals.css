@@ -83,14 +83,19 @@ body {
   background: var(--color-border-hover);
 }
 
-/* Base links */
-a {
-  color: var(--color-accent-blue);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* Base element styles live in the `base` layer so Tailwind utilities (which
+   are also layered) can override them. Unlayered element rules outrank every
+   utility regardless of specificity, which previously made primary CTA labels
+   render in the link colour instead of white. */
+@layer base {
+  a {
+    color: var(--color-accent-blue);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
 /* Monospace */
@@ -115,42 +120,45 @@ a:hover {
 }
 
 /* Heading styles */
-h1, h2, h3, h4 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
+@layer base {
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
 
-/* Code blocks */
-pre, code {
-  background: var(--color-bg-primary);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem;
-}
+  /* Code blocks */
+  pre, code {
+    background: var(--color-bg-primary);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+  }
 
-pre {
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
+  pre {
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
 
-code {
-  font-size: 0.875em;
-}
+  code {
+    font-size: 0.875em;
+  }
 
-/* Form elements */
-input, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
-}
+  /* Form elements */
+  input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+  }
 
-/* Button reset */
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-  padding: 0;
+  /* Button reset: no border/background by default, utilities can add them. */
+  button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
 }
 
 /* Hide default focus for mouse users */
@@ -172,4 +180,89 @@ button {
 }
 .low-severity {
   color: var(--color-low-severity);
+}
+
+/* ---------------------------------------------------------------------------
+   Liquid-glass surfaces (Phase 3.11)
+   Layered translucency, a fine illuminated border and a single specular
+   highlight. Blur is deliberately low so text stays crisp.
+   ------------------------------------------------------------------------- */
+
+.glass-card,
+.glass-panel {
+  position: relative;
+  border: 1px solid var(--color-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
+    var(--color-bg-secondary);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 18px 40px -30px rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 22px 44px -30px rgba(0, 0, 0, 1);
+}
+
+.glass-panel {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(59, 130, 246, 0.12), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
+    var(--color-bg-secondary);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+    0 30px 70px -40px rgba(0, 0, 0, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Primary action: metallic treatment, reserved for the main CTA only.
+   The explicit foreground colour also protects the label from the base
+   anchor colour, which previously rendered button text blue-on-blue.
+   ------------------------------------------------------------------------- */
+
+.btn-primary {
+  color: #ffffff;
+  border: 1px solid rgba(147, 183, 255, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.14) 100%),
+    linear-gradient(135deg, #5b95f8 0%, #3271e8 52%, #2559cc 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 12px 26px -16px rgba(37, 99, 235, 0.95);
+  transition: filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 14px 30px -16px rgba(37, 99, 235, 1);
+}
+
+.btn-primary:active:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.btn-primary:disabled {
+  cursor: not-allowed;
+  color: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(180deg, #2b3a52, #222d40);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Navigation and button-like links keep their own hover treatment instead of
+   inheriting the underlined base-link style. */
+header a:hover,
+a[class*="btn-primary"]:hover,
+a[class*="rounded-"]:hover {
+  text-decoration: none;
 }
