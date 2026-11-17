@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 
 const DEFAULT_API_ORIGIN = "http://127.0.0.1:8000";
-const UPSTREAM_TIMEOUT_MS = 60_000;
+const UPSTREAM_TIMEOUT_MS = 90_000;
 
 export const dynamic = "force-dynamic";
 
